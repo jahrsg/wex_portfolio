@@ -57,9 +57,9 @@ int main(int argc, char* argv[])
             cout << b.first << ": " << bs[b.first] << " (" << b.second << "BTC)" << std::endl;
             total += b.second;
         }
-        double rur_price = trade.info("rur").lastPrice;
-        double rur_total = total / rur_price;
-        cout << "Total: " << total << "BTC (" << rur_total << " RUR)" << std::endl;
+        double usd_price = trade.info("usd").lastPrice;
+        double usd_total = total / usd_price;
+        cout << "Total: " << total << "BTC (" << usd_total << "USD)" << std::endl;
         if (vm.count("balancelog"))
         {
             string fname = vm["balancelog"].as<string>();
@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
             if (!fout.is_open())
                 throw runtime_error("Failed to open file " + fname);
             time_t ttp = chrono::system_clock::to_time_t(chrono::system_clock::now());
-            fout << ttp << "," << total << "," << rur_total << endl;
+            fout << ttp << "," << total << "," << usd_total << endl;
         }
         Portfolio p;
         for (unsigned i = 0; i < coins.size(); ++i)

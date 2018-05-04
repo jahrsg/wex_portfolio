@@ -48,6 +48,7 @@ private:
         double max;
         double fee;
         double min_amount;
+        bool reverted;
     };
     std::map<std::string, PairParams> m_params;
 	std::map<std::string, CoinInfo> m_tickers;

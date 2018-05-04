@@ -84,9 +84,9 @@ long long WexTradeApi::createOrder(const Order& order)
     params["type"] = (order.action == BUY) ? "buy" : "sell";
     params["rate"] = double_to_string(order.price, m_params[order.coin].decimal_places);
     params["amount"] = double_to_string(order.amount, m_params[order.coin].decimal_places);
-    if(order.coin == "rur")
+    if(m_params[order.coin].reverted)
     {
-        params["pair"] = "btc_rur";
+        params["pair"] = "btc_" + order.coin;
         params["type"] = (order.action == BUY) ? "sell" : "buy";
         params["rate"] = double_to_string(1.0 / order.price, m_params[order.coin].decimal_places);
         params["amount"] = double_to_string(order.amount * order.price, m_params[order.coin].decimal_places);
@@ -202,8 +202,8 @@ std::vector<long long> WexTradeApi::getCurrentOrders(const string &coin)
     std::map<std::string, std::string> params;
     params["method"] = "returnOpenOrders";
     params["pair"] = coin + "_btc";
-    if(coin == "rur")
-        params["pair"] = "btc_rur";
+    if(m_params[coin].reverted)
+        params["pair"] = "btc_" + coin;
     std::istringstream is(call(params));
     ptree pt;
     read_json(is, pt);
@@ -374,11 +374,19 @@ void WexTradeApi::readTickers()
         std::string pair_name = it->first;
         if (pair_name.find("btc") == std::string::npos)
 			continue;
-        std::string coin = "rur";
-        if(pair_name != "btc_rur")
-            coin = pair_name.substr(0, pair_name.find("_"));
         PairParams params;
         ptree param_data = it->second;
+        std::string coin;
+        if(pair_name.substr(0, 4) != "btc_")
+        {
+            coin = pair_name.substr(0, pair_name.find("_"));
+            params.reverted = false;
+        }
+        else
+        {
+            coin = pair_name.substr(pair_name.find("_") + 1);
+            params.reverted = true;
+        }
         params.decimal_places = param_data.get<unsigned>("decimal_places");
         params.fee = param_data.get<double>("fee");
         params.max = param_data.get<double>("max_price");
@@ -394,9 +402,9 @@ void WexTradeApi::readTickers()
     for(auto it: pt)
     {
         std::string pair_name = it.first;
-        std::string coin = "rur";
+        std::string coin;
         CoinInfo i;
-        if(pair_name != "btc_rur")
+        if(pair_name.substr(0, 4) != "btc_")
         {
             coin = pair_name.substr(0, pair_name.find("_"));
             i.coin = coin;
@@ -406,7 +414,7 @@ void WexTradeApi::readTickers()
         }
         else
         {
-            coin = "rur";
+            coin = pair_name.substr(pair_name.find("_") + 1);
             i.coin = coin;
             i.buyPrice = 1.0 / it.second.get<double>("buy");
             i.sellPrice = 1.0 / it.second.get<double>("sell");
@@ -414,6 +422,14 @@ void WexTradeApi::readTickers()
         }
         m_tickers[coin] = i;
     }
+}
+
+bool is_token(const std::string& name)
+{
+    if(name.length() < 2)
+        return false;
+    size_t pos = name.length() - 2;
+    return (name.substr(pos, 2) == "et");
 }
 
 void WexTradeApi::readBalances()
@@ -434,6 +450,8 @@ void WexTradeApi::readBalances()
     ptree funds = pt.get_child("return").get_child("funds");
     for (ptree::iterator it = funds.begin(); it != funds.end(); ++it)
 	{
+        if(is_token(it->first))
+            continue;
         double balance = boost::lexical_cast<double>(it->second.data());
         if(balance > 0.001)
             m_balances[it->first] = balance;
